@@ -1,34 +1,36 @@
 document.getElementById("calcForm").addEventListener("submit", function(e) {
   e.preventDefault();
 
-  // Eingabewerte holen
   const t_out = parseFloat(document.getElementById("t_out").value);
   const rh_out = parseFloat(document.getElementById("rh_out").value);
   const t_supply = parseFloat(document.getElementById("t_supply").value);
   const rh_supply = parseFloat(document.getElementById("rh_supply").value);
-  const v_air = parseFloat(document.getElementById("v_air").value); // m³/h
+  const v_air = parseFloat(document.getElementById("v_air").value);
 
-  // Umrechnungen
-  const rho_air = 1.2; // kg/m³ (vereinfachte Luftdichte)
+  const rho_air = 1.2; // kg/m³
   const m_air = rho_air * v_air; // kg/h
 
   const x_out = calcAbsFeuchte(t_out, rh_out); // g/kg
   const x_supply = calcAbsFeuchte(t_supply, rh_supply); // g/kg
 
+  const t_kühl = 12; // angenommene Temperatur nach Kühler (z. B. Taupunkt)
+  const x_kühl = x_supply; // Luftfeuchte nach Entfeuchtung
+  const h_out = calcEnthalpie(t_out, x_out);
+  const h_kühl = calcEnthalpie(t_kühl, x_kühl);
+  const h_supply = calcEnthalpie(t_supply, x_supply);
+
   const delta_x = x_out - x_supply; // g/kg
-  const m_wasser = m_air * (delta_x / 1000); // kg/h
+  const m_wasser_kühler = m_air * (delta_x / 1000); // kg/h
 
-  const h_out = calcEnthalpie(t_out, x_out); // kJ/kg
-  const h_supply = calcEnthalpie(t_supply, x_supply); // kJ/kg
+  const q_kühl = m_air * (h_out - h_kühl) / 3600; // kW
+  const q_nacherh = m_air * (h_supply - h_kühl) / 3600; // kW
 
-  const q_kühl = m_air * (h_out - h_supply) / 3600; // kW
+  const c_water = 4.18;
+  const dt_kühl = 5;
+  const dt_heiz = 20; // z. B. 70/50 Vorlauf/Rücklauf
+  const v_wasser_kühler = q_kühl * 3600 / (c_water * dt_kühl * 1000); // m³/h
+  const v_wasser_heizung = q_nacherh * 3600 / (c_water * dt_heiz * 1000); // m³/h
 
-  // Annahme: ΔT Wasser = 5K, spez. Wärmekapazität = 4.18 kJ/kgK
-  const c_water = 4.18; // kJ/kgK
-  const deltaT_water = 5; // K
-  const m_water = q_kühl * 3600 / (c_water * deltaT_water * 1000); // m³/h (ca. mit ρ=1)
-
-  // Ausgabe formatieren
   const output = `
 Außenluft:
 - Temperatur: ${t_out.toFixed(1)} °C
@@ -46,25 +48,89 @@ Luft:
 
 Entfeuchtung:
 - Feuchtedifferenz: ${delta_x.toFixed(2)} g/kg
-- Kondensatmenge: ${m_wasser.toFixed(2)} kg/h
+- Kondensatmenge: ${m_wasser_kühler.toFixed(2)} kg/h
 
 Kühler:
 - Kälteleistung: ${q_kühl.toFixed(2)} kW
-- Wasser-Volumenstrom (bei 8/13 °C): ${m_water.toFixed(2)} m³/h
+- Wasser-Volumenstrom (8/13 °C): ${v_wasser_kühler.toFixed(2)} m³/h
+
+Nacherwärmer:
+- Heizleistung: ${q_nacherh.toFixed(2)} kW
+- Wasser-Volumenstrom (70/50 °C): ${v_wasser_heizung.toFixed(2)} m³/h
   `;
 
   document.getElementById("output").textContent = output;
+
+  // Diagramm: 3 Zustände: Außenluft → entfeuchtet → Zuluft
+  updateChart(
+    [x_out, x_kühl, x_supply],
+    [t_out, t_kühl, t_supply]
+  );
 });
 
 function calcAbsFeuchte(temp, rh) {
-  // Tetens-Formel (Sättigungsdampfdruck in hPa)
   const p_sat = 6.1078 * Math.exp((17.27 * temp) / (temp + 237.3));
   const p_dampf = rh / 100 * p_sat;
-  const x = 622 * (p_dampf / (1013 - p_dampf)); // g/kg
+  const x = 622 * (p_dampf / (1013 - p_dampf));
   return x;
 }
 
 function calcEnthalpie(temp, x) {
-  // Enthalpie in kJ/kg
-  return 1.005 * temp + x / 1000 * (2501 + 1.86 * temp);
+  return 1.005 * temp + (x / 1000) * (2501 + 1.86 * temp);
+}
+
+let chart;
+function updateChart(xVals, tVals) {
+  const ctx = document.getElementById('hxChart').getContext('2d');
+  const dataPoints = xVals.map((x, i) => ({ x: x, y: tVals[i] }));
+
+  const data = {
+    datasets: [{
+      label: 'Zustandsänderung',
+      data: dataPoints,
+      borderColor: 'blue',
+      backgroundColor: 'lightblue',
+      tension: 0.2,
+      pointRadius: 6
+    }]
+  };
+
+  const config = {
+    type: 'line',
+    data: data,
+    options: {
+      responsive: true,
+      plugins: {
+        title: {
+          display: true,
+          text: 'h-x-Diagramm: Außenluft → Entfeuchtung → Zuluft'
+        }
+      },
+      scales: {
+        x: {
+          title: {
+            display: true,
+            text: 'Absolute Feuchte x [g/kg]'
+          },
+          min: 0,
+          max: 30
+        },
+        y: {
+          title: {
+            display: true,
+            text: 'Temperatur [°C]'
+          },
+          min: 0,
+          max: 40
+        }
+      }
+    }
+  };
+
+  if (chart) {
+    chart.data = data;
+    chart.update();
+  } else {
+    chart = new Chart(ctx, config);
+  }
 }
