@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Entfeuchtungsrechner Lüftungsanlage</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Entfeuchtungsrechner für Lüftungsanlagen</h1>
+
+  <form id="calcForm">
+    <fieldset>
+      <legend>Außenluftzustand</legend>
+      <label>Temperatur [°C]:
+        <input type="number" id="t_out" step="0.1" required>
+      </label>
+      <label>Relative Feuchte [%]:
+        <input type="number" id="rh_out" step="0.1" required>
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Zuluftanforderung</legend>
+      <label>Temperatur [°C]:
+        <input type="number" id="t_supply" step="0.1" required>
+      </label>
+      <label>Relative Feuchte [%]:
+        <input type="number" id="rh_supply" step="0.1" required>
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Anlageparameter</legend>
+      <label>Luftvolumenstrom [m³/h]:
+        <input type="number" id="v_air" step="10" required>
+      </label>
+    </fieldset>
+
+    <button type="submit">Berechnen</button>
+  </form>
+
+  <section id="results">
+    <h2>Ergebnisse</h2>
+    <pre id="output">Bitte Daten eingeben und auf "Berechnen" klicken.</pre>
+  </section>
+
+  <script src="script.js"></script>
+</body>
+</html>
