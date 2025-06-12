@@ -13,45 +13,44 @@ document.getElementById("calcForm").addEventListener("submit", function(e) {
   const c_water = 4.18;    // kJ/kgK
   const dt_kühl = 5;       // ΔT Kühler (8/13 °C)
   const dt_heiz = 20;      // ΔT Erwärmer (70/50 °C)
-  const t_kühl = 12;       // angenommene Lufttemp. nach Kühler
+  const t_kühl = 12;       // angenommene Lufttemperatur nach Kühler
 
-  // Berechnungen Feuchte & Enthalpie
-  const m_air = rho_air * v_air;                     // kg/h
-  const x_out = calcAbsFeuchte(t_out, rh_out);       // g/kg
-  const x_supply = calcAbsFeuchte(t_supply, rh_supply); // g/kg
-  const x_kühl = x_supply;                           // auf Soll-Feuchte entfeuchtet
-  const rh_kühl = calcRelFeuchte(t_kühl, x_kühl);    // berechnete rel. Feuchte nach Kühler
+  // Berechnungen
+  const m_air = rho_air * v_air;                         // kg/h
+  const x_out = calcAbsFeuchte(t_out, rh_out);           // g/kg
+  const x_supply = calcAbsFeuchte(t_supply, rh_supply);  // g/kg
+  const x_kühl = x_supply;                               // Ziel: gleiche Feuchte wie Zuluft
+  const rh_kühl = calcRelFeuchte(t_kühl, x_kühl);        // berechnete RH nach Kühler
 
-  const h_out = calcEnthalpie(t_out, x_out);         // kJ/kg
-  const h_kühl = calcEnthalpie(t_kühl, x_kühl);      // kJ/kg
-  const h_supply = calcEnthalpie(t_supply, x_supply);// kJ/kg
+  const h_out = calcEnthalpie(t_out, x_out);             // kJ/kg
+  const h_kühl = calcEnthalpie(t_kühl, x_kühl);          // kJ/kg
+  const h_supply = calcEnthalpie(t_supply, x_supply);    // kJ/kg
 
-  // Entfeuchtung & Kühlung
-  const delta_x = x_out - x_supply;                  // g/kg
-  const m_wasser_kühler = m_air * (delta_x / 1000);  // kg/h
-  const q_kühl = m_air * (h_out - h_kühl) / 3600;    // kW
+  const delta_x = x_out - x_supply;                      // g/kg
+  const m_wasser_kühler = m_air * (delta_x / 1000);      // kg/h
+
+  const q_kühl = m_air * (h_out - h_kühl) / 3600;        // kW
+  const q_nacherh = m_air * (h_supply - h_kühl) / 3600;  // kW
+
   const v_wasser_kühler = q_kühl * 3600 / (c_water * dt_kühl * 1000); // m³/h
-
-  // Nacherwärmung
-  const q_nacherh = m_air * (h_supply - h_kühl) / 3600; // kW
   const v_wasser_heizung = q_nacherh * 3600 / (c_water * dt_heiz * 1000); // m³/h
 
-  // Ausgabe
+  // Ausgabe vorbereiten
   const output = `
 💨 Außenluft:
 - Temperatur: ${t_out.toFixed(1)} °C
 - Relative Feuchte: ${rh_out.toFixed(1)} %
 - Absolute Feuchte: ${x_out.toFixed(2)} g/kg
 
-🌡️ Zustand nach dem Kühler:
+💧 Zuluft nach dem Kühler (nach Entfeuchtung):
 - Temperatur: ${t_kühl.toFixed(1)} °C
 - Absolute Feuchte: ${x_kühl.toFixed(2)} g/kg
 - Relative Feuchte: ${rh_kühl.toFixed(1)} %
 
-💨 Zuluft (nach Erwärmung):
+🔥 Zuluft nach Erwärmer (Endzustand zur Raumversorgung):
 - Temperatur: ${t_supply.toFixed(1)} °C
-- Relative Feuchte: ${rh_supply.toFixed(1)} %
-- Absolute Feuchte: ${x_supply.toFixed(2)} g/kg
+- Relative Feuchte (Zielwert): ${rh_supply.toFixed(1)} %
+- Absolute Feuchte (wie nach Kühler): ${x_supply.toFixed(2)} g/kg
 
 🔁 Luftstrom:
 - Volumenstrom: ${v_air.toFixed(0)} m³/h
@@ -78,7 +77,8 @@ document.getElementById("calcForm").addEventListener("submit", function(e) {
   );
 });
 
-// Hilfsfunktionen
+// --- Hilfsfunktionen ---
+
 function calcAbsFeuchte(temp, rh) {
   const p_sat = 6.1078 * Math.exp((17.27 * temp) / (temp + 237.3));
   const p_dampf = rh / 100 * p_sat;
@@ -96,7 +96,8 @@ function calcEnthalpie(temp, x) {
   return 1.005 * temp + (x / 1000) * (2501 + 1.86 * temp);
 }
 
-// Diagramm
+// --- Diagramm-Funktion ---
+
 let chart;
 function updateChart(xVals, tVals) {
   const ctx = document.getElementById('hxChart').getContext('2d');
